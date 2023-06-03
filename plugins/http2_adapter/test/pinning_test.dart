@@ -13,8 +13,7 @@ void main() {
   // All badssl.com hosts have the same cert, they just have TLS
   // setting or other differences (like host name) that make them bad.
   final lines = File('test/_pinning_http2.txt').readAsLinesSync();
-  final fingerprint =
-      lines.first.split('=').last.toLowerCase().replaceAll(':', '');
+  final fingerprint = lines.first.split('=').last.replaceAll(':', '');
 
   group('SSL pinning', () {
     final Dio dio = Dio()

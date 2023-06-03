@@ -7,18 +7,21 @@ import 'package:dio/dio.dart';
 import 'package:http2/http2.dart';
 
 part 'client_setting.dart';
-
 part 'connection_manager.dart';
-
 part 'connection_manager_imp.dart';
 
 /// A Dio HttpAdapter which implements Http/2.0.
 class Http2Adapter implements HttpClientAdapter {
+  final ConnectionManager _connectionMgr;
+
   Http2Adapter(
     ConnectionManager? connectionManager,
   ) : _connectionMgr = connectionManager ?? ConnectionManager();
 
-  final ConnectionManager _connectionMgr;
+  @override
+  void close({bool force = false}) {
+    _connectionMgr.close(force: force);
+  }
 
   @override
   Future<ResponseBody> fetch(
@@ -64,7 +67,7 @@ class Http2Adapter implements HttpClientAdapter {
       options.headers.keys
           .map(
             (key) => Header.ascii(
-              key.toLowerCase(),
+              key,
               options.headers[key] as String? ?? '',
             ),
           )
@@ -174,10 +177,5 @@ class Http2Adapter implements HttpClientAdapter {
     return options.followRedirects &&
         options.maxRedirects > 0 &&
         statusCodes.contains(status);
-  }
-
-  @override
-  void close({bool force = false}) {
-    _connectionMgr.close(force: force);
   }
 }

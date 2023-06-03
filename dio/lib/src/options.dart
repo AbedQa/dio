@@ -18,71 +18,18 @@ import 'utils.dart';
 ///   for example: response data is compressed with gzip or no content-length header.
 typedef ProgressCallback = void Function(int count, int total);
 
-/// ResponseType indicates which transformation should
-/// be automatically applied to the response data by Dio.
-enum ResponseType {
-  /// Transform the response data to JSON object only when the
-  /// content-type of response is "application/json" .
-  json,
-
-  /// Get the response stream without any transformation. The
-  /// Response data will be a [ResponseBody] instance.
-  ///
-  ///    Response<ResponseBody> rs = await Dio().get<ResponseBody>(
-  ///      url,
-  ///      options: Options(
-  ///        responseType: ResponseType.stream,
-  ///      ),
-  ///    );
-  stream,
-
-  /// Transform the response data to a String encoded with UTF8.
-  plain,
-
-  /// Get original bytes, the type of [Response.data] will be List<int>
-  bytes
-}
-
-/// ListFormat specifies the array format
-/// (a single parameter with multiple parameter or multiple parameters with the same name)
-/// and the separator for array items.
-enum ListFormat {
-  /// Comma-separated values
-  /// e.g. (foo,bar,baz)
-  csv,
-
-  /// Space-separated values
-  /// e.g. (foo bar baz)
-  ssv,
-
-  /// Tab-separated values
-  /// e.g. (foo\tbar\tbaz)
-  tsv,
-
-  /// Pipe-separated values
-  /// e.g. (foo|bar|baz)
-  pipes,
-
-  /// Multiple parameter instances rather than multiple values.
-  /// e.g. (foo=value&foo=another_value)
-  multi,
-
-  /// Forward compatibility
-  /// e.g. (foo[]=value&foo[]=another_value)
-  multiCompatible,
-}
-
-typedef ValidateStatus = bool Function(int? status);
+typedef RequestEncoder = List<int> Function(
+  String request,
+  RequestOptions options,
+);
 
 typedef ResponseDecoder = String? Function(
   List<int> responseBytes,
   RequestOptions options,
   ResponseBody responseBody,
 );
-typedef RequestEncoder = List<int> Function(
-  String request,
-  RequestOptions options,
-);
+
+typedef ValidateStatus = bool Function(int? status);
 
 /// The common config for the Dio instance.
 /// `dio.options` is a instance of [BaseOptions]
@@ -176,173 +123,37 @@ class BaseOptions extends _RequestConfig with OptionsMixin {
   }
 }
 
-mixin OptionsMixin {
-  /// Request base url, it can contain sub paths like: https://pub.dev/api/.
-  late String baseUrl;
+/// ListFormat specifies the array format
+/// (a single parameter with multiple parameter or multiple parameters with the same name)
+/// and the separator for array items.
+enum ListFormat {
+  /// Comma-separated values
+  /// e.g. (foo,bar,baz)
+  csv,
 
-  /// Common query parameters.
-  ///
-  /// List values use the default [ListFormat.multiCompatible].
-  ///
-  /// The value can be overridden per parameter by adding a [ListParam]
-  /// object wrapping the actual List value and the desired format.
-  late Map<String, dynamic> queryParameters;
+  /// Space-separated values
+  /// e.g. (foo bar baz)
+  ssv,
 
-  /// Timeout in milliseconds for opening url.
-  /// [Dio] will throw the [DioException] with [DioExceptionType.connectionTimeout] type
-  ///  when time out.
-  Duration? get connectTimeout => _connectTimeout;
+  /// Tab-separated values
+  /// e.g. (foo\tbar\tbaz)
+  tsv,
 
-  set connectTimeout(Duration? value) {
-    if (value != null && value.isNegative) {
-      throw StateError('connectTimeout should be positive');
-    }
-    _connectTimeout = value;
-  }
+  /// Pipe-separated values
+  /// e.g. (foo|bar|baz)
+  pipes,
 
-  Duration? _connectTimeout;
+  /// Multiple parameter instances rather than multiple values.
+  /// e.g. (foo=value&foo=another_value)
+  multi,
+
+  /// Forward compatibility
+  /// e.g. (foo[]=value&foo[]=another_value)
+  multiCompatible,
 }
 
 /// Every request can pass an [Options] object which will be merged with [Dio.options]
 class Options {
-  Options({
-    this.method,
-    Duration? sendTimeout,
-    Duration? receiveTimeout,
-    this.extra,
-    this.headers,
-    this.responseType,
-    this.contentType,
-    this.validateStatus,
-    this.receiveDataWhenStatusError,
-    this.followRedirects,
-    this.maxRedirects,
-    this.persistentConnection,
-    this.requestEncoder,
-    this.responseDecoder,
-    this.listFormat,
-  })  : assert(receiveTimeout == null || !receiveTimeout.isNegative),
-        _receiveTimeout = receiveTimeout,
-        assert(sendTimeout == null || !sendTimeout.isNegative),
-        _sendTimeout = sendTimeout;
-
-  /// Create a Option from current instance with merging attributes.
-  Options copyWith({
-    String? method,
-    Duration? sendTimeout,
-    Duration? receiveTimeout,
-    Map<String, Object?>? extra,
-    Map<String, Object?>? headers,
-    ResponseType? responseType,
-    String? contentType,
-    ValidateStatus? validateStatus,
-    bool? receiveDataWhenStatusError,
-    bool? followRedirects,
-    int? maxRedirects,
-    bool? persistentConnection,
-    RequestEncoder? requestEncoder,
-    ResponseDecoder? responseDecoder,
-    ListFormat? listFormat,
-  }) {
-    Map<String, dynamic>? effectiveHeaders;
-    if (headers == null && this.headers != null) {
-      effectiveHeaders = caseInsensitiveKeyMap(this.headers!);
-    }
-
-    if (headers != null) {
-      headers = caseInsensitiveKeyMap(headers);
-      assert(
-        !(contentType != null &&
-            headers.containsKey(Headers.contentTypeHeader)),
-        'You cannot set both contentType param and a content-type header',
-      );
-    }
-
-    Map<String, dynamic>? effectiveExtra;
-    if (extra == null && this.extra != null) {
-      effectiveExtra = Map.from(this.extra!);
-    }
-
-    return Options(
-      method: method ?? this.method,
-      sendTimeout: sendTimeout ?? this.sendTimeout,
-      receiveTimeout: receiveTimeout ?? this.receiveTimeout,
-      extra: extra ?? effectiveExtra,
-      headers: headers ?? effectiveHeaders,
-      responseType: responseType ?? this.responseType,
-      contentType: contentType ?? this.contentType,
-      validateStatus: validateStatus ?? this.validateStatus,
-      receiveDataWhenStatusError:
-          receiveDataWhenStatusError ?? this.receiveDataWhenStatusError,
-      followRedirects: followRedirects ?? this.followRedirects,
-      maxRedirects: maxRedirects ?? this.maxRedirects,
-      persistentConnection: persistentConnection ?? this.persistentConnection,
-      requestEncoder: requestEncoder ?? this.requestEncoder,
-      responseDecoder: responseDecoder ?? this.responseDecoder,
-      listFormat: listFormat ?? this.listFormat,
-    );
-  }
-
-  RequestOptions compose(
-    BaseOptions baseOpt,
-    String path, {
-    Object? data,
-    Map<String, dynamic>? queryParameters,
-    CancelToken? cancelToken,
-    Options? options,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-    StackTrace? sourceStackTrace,
-  }) {
-    final query = <String, dynamic>{};
-    query.addAll(baseOpt.queryParameters);
-    if (queryParameters != null) query.addAll(queryParameters);
-
-    final headers = caseInsensitiveKeyMap(baseOpt.headers);
-    if (this.headers != null) {
-      headers.addAll(this.headers!);
-    }
-    if (this.contentType != null) {
-      headers[Headers.contentTypeHeader] = this.contentType;
-    }
-    final String? contentType = headers[Headers.contentTypeHeader];
-    final extra = Map<String, dynamic>.from(baseOpt.extra);
-    if (this.extra != null) {
-      extra.addAll(this.extra!);
-    }
-    final method = (this.method ?? baseOpt.method).toUpperCase();
-    final requestOptions = RequestOptions(
-      method: method,
-      headers: headers,
-      extra: extra,
-      baseUrl: baseOpt.baseUrl,
-      path: path,
-      data: data,
-      sourceStackTrace: sourceStackTrace ?? StackTrace.current,
-      connectTimeout: baseOpt.connectTimeout,
-      sendTimeout: sendTimeout ?? baseOpt.sendTimeout,
-      receiveTimeout: receiveTimeout ?? baseOpt.receiveTimeout,
-      responseType: responseType ?? baseOpt.responseType,
-      validateStatus: validateStatus ?? baseOpt.validateStatus,
-      receiveDataWhenStatusError:
-          receiveDataWhenStatusError ?? baseOpt.receiveDataWhenStatusError,
-      followRedirects: followRedirects ?? baseOpt.followRedirects,
-      maxRedirects: maxRedirects ?? baseOpt.maxRedirects,
-      persistentConnection:
-          persistentConnection ?? baseOpt.persistentConnection,
-      queryParameters: query,
-      requestEncoder: requestEncoder ?? baseOpt.requestEncoder,
-      responseDecoder: responseDecoder ?? baseOpt.responseDecoder,
-      listFormat: listFormat ?? baseOpt.listFormat,
-      onReceiveProgress: onReceiveProgress,
-      onSendProgress: onSendProgress,
-      cancelToken: cancelToken,
-      contentType: contentType ?? this.contentType ?? baseOpt.contentType,
-    );
-    requestOptions.cancelToken?.requestOptions = requestOptions;
-    return requestOptions;
-  }
-
   /// Http method.
   String? method;
 
@@ -353,34 +164,7 @@ class Options {
   /// regard as the same key.
   Map<String, dynamic>? headers;
 
-  /// Timeout in milliseconds for sending data.
-  /// [Dio] will throw the [DioException] with [DioExceptionType.sendTimeout] type
-  ///  when time out.
-  Duration? get sendTimeout => _sendTimeout;
-
-  set sendTimeout(Duration? value) {
-    if (value != null && value.isNegative) {
-      throw StateError('sendTimeout should be positive');
-    }
-    _sendTimeout = value;
-  }
-
   Duration? _sendTimeout;
-
-  ///  Timeout in milliseconds for receiving data.
-  ///
-  ///  Note: [receiveTimeout]  represents a timeout during data transfer! That is to say the
-  ///  client has connected to the server, and the server starts to send data to the client.
-  ///
-  /// `null` meanings no timeout limit.
-  Duration? get receiveTimeout => _receiveTimeout;
-
-  set receiveTimeout(Duration? value) {
-    if (value != null && value.isNegative) {
-      throw StateError('receiveTimeout should be positive');
-    }
-    _receiveTimeout = value;
-  }
 
   Duration? _receiveTimeout;
 
@@ -448,9 +232,228 @@ class Options {
   /// Possible values defined in [ListFormat] are `csv`, `ssv`, `tsv`, `pipes`, `multi`, `multiCompatible`.
   /// The default value is `multi`.
   ListFormat? listFormat;
+
+  Options({
+    this.method,
+    Duration? sendTimeout,
+    Duration? receiveTimeout,
+    this.extra,
+    this.headers,
+    this.responseType,
+    this.contentType,
+    this.validateStatus,
+    this.receiveDataWhenStatusError,
+    this.followRedirects,
+    this.maxRedirects,
+    this.persistentConnection,
+    this.requestEncoder,
+    this.responseDecoder,
+    this.listFormat,
+  })  : assert(receiveTimeout == null || !receiveTimeout.isNegative),
+        _receiveTimeout = receiveTimeout,
+        assert(sendTimeout == null || !sendTimeout.isNegative),
+        _sendTimeout = sendTimeout;
+
+  ///  Timeout in milliseconds for receiving data.
+  ///
+  ///  Note: [receiveTimeout]  represents a timeout during data transfer! That is to say the
+  ///  client has connected to the server, and the server starts to send data to the client.
+  ///
+  /// `null` meanings no timeout limit.
+  Duration? get receiveTimeout => _receiveTimeout;
+
+  set receiveTimeout(Duration? value) {
+    if (value != null && value.isNegative) {
+      throw StateError('receiveTimeout should be positive');
+    }
+    _receiveTimeout = value;
+  }
+
+  /// Timeout in milliseconds for sending data.
+  /// [Dio] will throw the [DioException] with [DioExceptionType.sendTimeout] type
+  ///  when time out.
+  Duration? get sendTimeout => _sendTimeout;
+
+  set sendTimeout(Duration? value) {
+    if (value != null && value.isNegative) {
+      throw StateError('sendTimeout should be positive');
+    }
+    _sendTimeout = value;
+  }
+
+  RequestOptions compose(
+    BaseOptions baseOpt,
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
+    Options? options,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+    StackTrace? sourceStackTrace,
+  }) {
+    final query = <String, dynamic>{};
+    query.addAll(baseOpt.queryParameters);
+    if (queryParameters != null) query.addAll(queryParameters);
+
+    final headers = caseInsensitiveKeyMap(baseOpt.headers);
+    if (this.headers != null) {
+      headers.addAll(this.headers!);
+    }
+    if (this.contentType != null) {
+      headers[Headers.contentTypeHeader] = this.contentType;
+    }
+    final String? contentType = headers[Headers.contentTypeHeader];
+    final extra = Map<String, dynamic>.from(baseOpt.extra);
+    if (this.extra != null) {
+      extra.addAll(this.extra!);
+    }
+    final method = (this.method ?? baseOpt.method).toUpperCase();
+    final requestOptions = RequestOptions(
+      method: method,
+      headers: headers,
+      extra: extra,
+      baseUrl: baseOpt.baseUrl,
+      path: path,
+      data: data,
+      sourceStackTrace: sourceStackTrace ?? StackTrace.current,
+      connectTimeout: baseOpt.connectTimeout,
+      sendTimeout: sendTimeout ?? baseOpt.sendTimeout,
+      receiveTimeout: receiveTimeout ?? baseOpt.receiveTimeout,
+      responseType: responseType ?? baseOpt.responseType,
+      validateStatus: validateStatus ?? baseOpt.validateStatus,
+      receiveDataWhenStatusError:
+          receiveDataWhenStatusError ?? baseOpt.receiveDataWhenStatusError,
+      followRedirects: followRedirects ?? baseOpt.followRedirects,
+      maxRedirects: maxRedirects ?? baseOpt.maxRedirects,
+      persistentConnection:
+          persistentConnection ?? baseOpt.persistentConnection,
+      queryParameters: query,
+      requestEncoder: requestEncoder ?? baseOpt.requestEncoder,
+      responseDecoder: responseDecoder ?? baseOpt.responseDecoder,
+      listFormat: listFormat ?? baseOpt.listFormat,
+      onReceiveProgress: onReceiveProgress,
+      onSendProgress: onSendProgress,
+      cancelToken: cancelToken,
+      contentType: contentType ?? this.contentType ?? baseOpt.contentType,
+    );
+    requestOptions.cancelToken?.requestOptions = requestOptions;
+    return requestOptions;
+  }
+
+  /// Create a Option from current instance with merging attributes.
+  Options copyWith({
+    String? method,
+    Duration? sendTimeout,
+    Duration? receiveTimeout,
+    Map<String, Object?>? extra,
+    Map<String, Object?>? headers,
+    ResponseType? responseType,
+    String? contentType,
+    ValidateStatus? validateStatus,
+    bool? receiveDataWhenStatusError,
+    bool? followRedirects,
+    int? maxRedirects,
+    bool? persistentConnection,
+    RequestEncoder? requestEncoder,
+    ResponseDecoder? responseDecoder,
+    ListFormat? listFormat,
+  }) {
+    Map<String, dynamic>? effectiveHeaders;
+    if (headers == null && this.headers != null) {
+      effectiveHeaders = caseInsensitiveKeyMap(this.headers!);
+    }
+
+    if (headers != null) {
+      headers = caseInsensitiveKeyMap(headers);
+      assert(
+        !(contentType != null &&
+            headers.containsKey(Headers.contentTypeHeader)),
+        'You cannot set both contentType param and a content-type header',
+      );
+    }
+
+    Map<String, dynamic>? effectiveExtra;
+    if (extra == null && this.extra != null) {
+      effectiveExtra = Map.from(this.extra!);
+    }
+
+    return Options(
+      method: method ?? this.method,
+      sendTimeout: sendTimeout ?? this.sendTimeout,
+      receiveTimeout: receiveTimeout ?? this.receiveTimeout,
+      extra: extra ?? effectiveExtra,
+      headers: headers ?? effectiveHeaders,
+      responseType: responseType ?? this.responseType,
+      contentType: contentType ?? this.contentType,
+      validateStatus: validateStatus ?? this.validateStatus,
+      receiveDataWhenStatusError:
+          receiveDataWhenStatusError ?? this.receiveDataWhenStatusError,
+      followRedirects: followRedirects ?? this.followRedirects,
+      maxRedirects: maxRedirects ?? this.maxRedirects,
+      persistentConnection: persistentConnection ?? this.persistentConnection,
+      requestEncoder: requestEncoder ?? this.requestEncoder,
+      responseDecoder: responseDecoder ?? this.responseDecoder,
+      listFormat: listFormat ?? this.listFormat,
+    );
+  }
+}
+
+mixin OptionsMixin {
+  /// Request base url, it can contain sub paths like: https://pub.dev/api/.
+  late String baseUrl;
+
+  /// Common query parameters.
+  ///
+  /// List values use the default [ListFormat.multiCompatible].
+  ///
+  /// The value can be overridden per parameter by adding a [ListParam]
+  /// object wrapping the actual List value and the desired format.
+  late Map<String, dynamic> queryParameters;
+
+  Duration? _connectTimeout;
+
+  /// Timeout in milliseconds for opening url.
+  /// [Dio] will throw the [DioException] with [DioExceptionType.connectionTimeout] type
+  ///  when time out.
+  Duration? get connectTimeout => _connectTimeout;
+
+  set connectTimeout(Duration? value) {
+    if (value != null && value.isNegative) {
+      throw StateError('connectTimeout should be positive');
+    }
+    _connectTimeout = value;
+  }
 }
 
 class RequestOptions extends _RequestConfig with OptionsMixin {
+  /// The source [StackTrace] which should always point to
+  /// the invocation of [DioMixin.request] or if not provided,
+  /// to the construction of the [RequestOptions] instance.
+  /// In both instances the source context should still be
+  /// available before it is lost due to asynchronous operations.
+  @internal
+  StackTrace? sourceStackTrace;
+
+  /// Request data, can be any type.
+  ///
+  /// When using `x-www-url-encoded` body data,
+  /// List values use the default [ListFormat.multi].
+  ///
+  /// The value can be overridden per value by adding a [ListParam]
+  /// object wrapping the actual List value and the desired format.
+  dynamic data;
+
+  /// If the `path` starts with 'http(s)', the `baseURL` will be ignored,
+  /// otherwise, it will be combined and then resolved with the baseUrl.
+  String path;
+
+  CancelToken? cancelToken;
+
+  ProgressCallback? onReceiveProgress;
+
+  ProgressCallback? onSendProgress;
+
   RequestOptions({
     this.path = '',
     this.data,
@@ -501,6 +504,24 @@ class RequestOptions extends _RequestConfig with OptionsMixin {
     this.connectTimeout = connectTimeout;
   }
 
+  /// generate uri
+  Uri get uri {
+    String url = path;
+    if (!url.startsWith(RegExp(r'https?:'))) {
+      url = baseUrl + url;
+      final s = url.split(':/');
+      if (s.length == 2) {
+        url = '${s[0]}:/${s[1].replaceAll('//', '/')}';
+      }
+    }
+    final query = Transformer.urlEncodeQueryMap(queryParameters, listFormat);
+    if (query.isNotEmpty) {
+      url += (url.contains('?') ? '&' : '?') + query;
+    }
+    // Normalize the url.
+    return Uri.parse(url).normalizePath();
+  }
+
   /// Create a Option from current instance with merging attributes.
   RequestOptions copyWith({
     String? method,
@@ -529,9 +550,7 @@ class RequestOptions extends _RequestConfig with OptionsMixin {
     bool? setRequestContentTypeWhenNoPayload,
   }) {
     final contentTypeInHeader = headers != null &&
-        headers.keys
-            .map((e) => e.toLowerCase())
-            .contains(Headers.contentTypeHeader);
+        headers.keys.map((e) => e).contains(Headers.contentTypeHeader);
 
     assert(
       !(contentType != null && contentTypeInHeader),
@@ -574,171 +593,42 @@ class RequestOptions extends _RequestConfig with OptionsMixin {
 
     return ro;
   }
+}
 
-  /// The source [StackTrace] which should always point to
-  /// the invocation of [DioMixin.request] or if not provided,
-  /// to the construction of the [RequestOptions] instance.
-  /// In both instances the source context should still be
-  /// available before it is lost due to asynchronous operations.
-  @internal
-  StackTrace? sourceStackTrace;
+/// ResponseType indicates which transformation should
+/// be automatically applied to the response data by Dio.
+enum ResponseType {
+  /// Transform the response data to JSON object only when the
+  /// content-type of response is "application/json" .
+  json,
 
-  /// generate uri
-  Uri get uri {
-    String url = path;
-    if (!url.startsWith(RegExp(r'https?:'))) {
-      url = baseUrl + url;
-      final s = url.split(':/');
-      if (s.length == 2) {
-        url = '${s[0]}:/${s[1].replaceAll('//', '/')}';
-      }
-    }
-    final query = Transformer.urlEncodeQueryMap(queryParameters, listFormat);
-    if (query.isNotEmpty) {
-      url += (url.contains('?') ? '&' : '?') + query;
-    }
-    // Normalize the url.
-    return Uri.parse(url).normalizePath();
-  }
-
-  /// Request data, can be any type.
+  /// Get the response stream without any transformation. The
+  /// Response data will be a [ResponseBody] instance.
   ///
-  /// When using `x-www-url-encoded` body data,
-  /// List values use the default [ListFormat.multi].
-  ///
-  /// The value can be overridden per value by adding a [ListParam]
-  /// object wrapping the actual List value and the desired format.
-  dynamic data;
+  ///    Response<ResponseBody> rs = await Dio().get<ResponseBody>(
+  ///      url,
+  ///      options: Options(
+  ///        responseType: ResponseType.stream,
+  ///      ),
+  ///    );
+  stream,
 
-  /// If the `path` starts with 'http(s)', the `baseURL` will be ignored,
-  /// otherwise, it will be combined and then resolved with the baseUrl.
-  String path;
+  /// Transform the response data to a String encoded with UTF8.
+  plain,
 
-  CancelToken? cancelToken;
-
-  ProgressCallback? onReceiveProgress;
-
-  ProgressCallback? onSendProgress;
+  /// Get original bytes, the type of [Response.data] will be List<int>
+  bytes
 }
 
 /// The [_RequestConfig] class describes the http request information and configuration.
 class _RequestConfig {
-  _RequestConfig({
-    Duration? receiveTimeout,
-    Duration? sendTimeout,
-    String? method,
-    Map<String, dynamic>? extra,
-    Map<String, dynamic>? headers,
-    String? contentType,
-    ListFormat? listFormat,
-    bool? followRedirects,
-    int? maxRedirects,
-    bool? persistentConnection,
-    bool? receiveDataWhenStatusError,
-    ValidateStatus? validateStatus,
-    ResponseType? responseType,
-    this.requestEncoder,
-    this.responseDecoder,
-  })  : assert(receiveTimeout == null || !receiveTimeout.isNegative),
-        _receiveTimeout = receiveTimeout,
-        assert(sendTimeout == null || !sendTimeout.isNegative),
-        _sendTimeout = sendTimeout {
-    this.headers = headers;
-
-    final contentTypeInHeader =
-        this.headers.containsKey(Headers.contentTypeHeader);
-    assert(
-      !(contentType != null && contentTypeInHeader) ||
-          this.headers[Headers.contentTypeHeader] == contentType,
-      'You cannot set different values for contentType param and a content-type header',
-    );
-
-    this.method = method ?? 'GET';
-    this.listFormat = listFormat ?? ListFormat.multi;
-    this.extra = extra ?? {};
-    this.followRedirects = followRedirects ?? true;
-    this.maxRedirects = maxRedirects ?? 5;
-    this.persistentConnection = persistentConnection ?? true;
-    this.receiveDataWhenStatusError = receiveDataWhenStatusError ?? true;
-    this.validateStatus = validateStatus ??
-        (int? status) {
-          return status != null && status >= 200 && status < 300;
-        };
-    this.responseType = responseType ?? ResponseType.json;
-    if (!contentTypeInHeader) {
-      this.contentType = contentType;
-    }
-  }
-
   /// Http method.
   late String method;
 
-  /// Http request headers. The keys of initial headers will be converted to lowercase,
-  /// for example 'Content-Type' will be converted to 'content-type'.
-  ///
-  /// The key of Header Map is case-insensitive, eg: content-type and Content-Type are
-  /// regard as the same key.
-
-  Map<String, dynamic> get headers => _headers;
   late Map<String, dynamic> _headers;
 
-  set headers(Map<String, dynamic>? headers) {
-    _headers = caseInsensitiveKeyMap(headers);
-    if (!_headers.containsKey(Headers.contentTypeHeader) &&
-        _defaultContentType != null) {
-      _headers[Headers.contentTypeHeader] = _defaultContentType;
-    }
-  }
-
-  /// Timeout in milliseconds for sending data.
-  /// [Dio] will throw the [DioException] with [DioExceptionType.sendTimeout] type
-  ///  when time out.
-  ///
-  /// `null` meanings no timeout limit.
-  Duration? get sendTimeout => _sendTimeout;
-
-  set sendTimeout(Duration? value) {
-    if (value != null && value.isNegative) {
-      throw StateError('sendTimeout should be positive');
-    }
-    _sendTimeout = value;
-  }
-
   Duration? _sendTimeout;
-
-  ///  Timeout in milliseconds for receiving data.
-  ///
-  ///  Note: [receiveTimeout]  represents a timeout during data transfer! That is to say the
-  ///  client has connected to the server, and the server starts to send data to the client.
-  ///
-  /// `null` meanings no timeout limit.
-  Duration? get receiveTimeout => _receiveTimeout;
-
-  set receiveTimeout(Duration? value) {
-    if (value != null && value.isNegative) {
-      throw StateError('receiveTimeout should be positive');
-    }
-    _receiveTimeout = value;
-  }
-
   Duration? _receiveTimeout;
-
-  /// The request Content-Type.
-  ///
-  /// [Dio] will automatically encode the request body accordingly.
-  ///
-  /// {@macro dio.interceptors.ImplyContentTypeInterceptor}
-  String? get contentType => _headers[Headers.contentTypeHeader] as String?;
-
-  set contentType(String? contentType) {
-    final newContentType = contentType?.trim();
-    _defaultContentType = newContentType;
-    if (newContentType != null) {
-      _headers[Headers.contentTypeHeader] = newContentType;
-    } else {
-      _headers.remove(Headers.contentTypeHeader);
-    }
-  }
 
   String? _defaultContentType;
 
@@ -800,4 +690,113 @@ class _RequestConfig {
   /// The value can be overridden per parameter by adding a [ListParam]
   /// object to the query or body data map.
   late ListFormat listFormat;
+
+  _RequestConfig({
+    Duration? receiveTimeout,
+    Duration? sendTimeout,
+    String? method,
+    Map<String, dynamic>? extra,
+    Map<String, dynamic>? headers,
+    String? contentType,
+    ListFormat? listFormat,
+    bool? followRedirects,
+    int? maxRedirects,
+    bool? persistentConnection,
+    bool? receiveDataWhenStatusError,
+    ValidateStatus? validateStatus,
+    ResponseType? responseType,
+    this.requestEncoder,
+    this.responseDecoder,
+  })  : assert(receiveTimeout == null || !receiveTimeout.isNegative),
+        _receiveTimeout = receiveTimeout,
+        assert(sendTimeout == null || !sendTimeout.isNegative),
+        _sendTimeout = sendTimeout {
+    this.headers = headers;
+
+    final contentTypeInHeader =
+        this.headers.containsKey(Headers.contentTypeHeader);
+    assert(
+      !(contentType != null && contentTypeInHeader) ||
+          this.headers[Headers.contentTypeHeader] == contentType,
+      'You cannot set different values for contentType param and a content-type header',
+    );
+
+    this.method = method ?? 'GET';
+    this.listFormat = listFormat ?? ListFormat.multi;
+    this.extra = extra ?? {};
+    this.followRedirects = followRedirects ?? true;
+    this.maxRedirects = maxRedirects ?? 5;
+    this.persistentConnection = persistentConnection ?? true;
+    this.receiveDataWhenStatusError = receiveDataWhenStatusError ?? true;
+    this.validateStatus = validateStatus ??
+        (int? status) {
+          return status != null && status >= 200 && status < 300;
+        };
+    this.responseType = responseType ?? ResponseType.json;
+    if (!contentTypeInHeader) {
+      this.contentType = contentType;
+    }
+  }
+
+  /// The request Content-Type.
+  ///
+  /// [Dio] will automatically encode the request body accordingly.
+  ///
+  /// {@macro dio.interceptors.ImplyContentTypeInterceptor}
+  String? get contentType => _headers[Headers.contentTypeHeader] as String?;
+
+  set contentType(String? contentType) {
+    final newContentType = contentType?.trim();
+    _defaultContentType = newContentType;
+    if (newContentType != null) {
+      _headers[Headers.contentTypeHeader] = newContentType;
+    } else {
+      _headers.remove(Headers.contentTypeHeader);
+    }
+  }
+
+  /// Http request headers. The keys of initial headers will be converted to lowercase,
+  /// for example 'Content-Type' will be converted to 'content-type'.
+  ///
+  /// The key of Header Map is case-insensitive, eg: content-type and Content-Type are
+  /// regard as the same key.
+
+  Map<String, dynamic> get headers => _headers;
+
+  set headers(Map<String, dynamic>? headers) {
+    _headers = caseInsensitiveKeyMap(headers);
+    if (!_headers.containsKey(Headers.contentTypeHeader) &&
+        _defaultContentType != null) {
+      _headers[Headers.contentTypeHeader] = _defaultContentType;
+    }
+  }
+
+  ///  Timeout in milliseconds for receiving data.
+  ///
+  ///  Note: [receiveTimeout]  represents a timeout during data transfer! That is to say the
+  ///  client has connected to the server, and the server starts to send data to the client.
+  ///
+  /// `null` meanings no timeout limit.
+  Duration? get receiveTimeout => _receiveTimeout;
+
+  set receiveTimeout(Duration? value) {
+    if (value != null && value.isNegative) {
+      throw StateError('receiveTimeout should be positive');
+    }
+    _receiveTimeout = value;
+  }
+
+  /// Timeout in milliseconds for sending data.
+  /// [Dio] will throw the [DioException] with [DioExceptionType.sendTimeout] type
+  ///  when time out.
+  ///
+  /// `null` meanings no timeout limit.
+  Duration? get sendTimeout => _sendTimeout;
+
+  set sendTimeout(Duration? value) {
+    if (value != null && value.isNegative) {
+      throw StateError('sendTimeout should be positive');
+    }
+    _sendTimeout = value;
+  }
 }

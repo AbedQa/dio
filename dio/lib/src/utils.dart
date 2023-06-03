@@ -5,29 +5,14 @@ import 'dart:convert';
 import 'options.dart';
 import 'parameter.dart';
 
-/// Pipes all data and errors from [stream] into [sink]. Completes [Future] once
-/// [stream] is done. Unlike [store], [sink] remains open after [stream] is
-/// done.
-Future writeStreamToSink(Stream stream, EventSink sink) {
-  final completer = Completer();
-  stream.listen(
-    sink.add,
-    onError: sink.addError,
-    onDone: () => completer.complete(),
+Map<String, V> caseInsensitiveKeyMap<V>([Map<String, V>? value]) {
+  final map = LinkedHashMap<String, V>(
+    equals: (key1, key2) => key1 == key2,
+    hashCode: (key) => key.hashCode,
   );
-  return completer.future;
+  if (value != null && value.isNotEmpty) map.addAll(value);
+  return map;
 }
-
-/// Returns the [Encoding] that corresponds to [charset]. Returns [fallback] if
-/// [charset] is null or if no [Encoding] was found that corresponds to
-/// [charset].
-Encoding encodingForCharset(String? charset, [Encoding fallback = latin1]) {
-  if (charset == null) return fallback;
-  final encoding = Encoding.getByName(charset);
-  return encoding ?? fallback;
-}
-
-typedef DioEncodeHandler = String? Function(String key, Object? value);
 
 String encodeMap(
   data,
@@ -110,6 +95,28 @@ String encodeMap(
   return urlData.toString();
 }
 
+/// Returns the [Encoding] that corresponds to [charset]. Returns [fallback] if
+/// [charset] is null or if no [Encoding] was found that corresponds to
+/// [charset].
+Encoding encodingForCharset(String? charset, [Encoding fallback = latin1]) {
+  if (charset == null) return fallback;
+  final encoding = Encoding.getByName(charset);
+  return encoding ?? fallback;
+}
+
+/// Pipes all data and errors from [stream] into [sink]. Completes [Future] once
+/// [stream] is done. Unlike [store], [sink] remains open after [stream] is
+/// done.
+Future writeStreamToSink(Stream stream, EventSink sink) {
+  final completer = Completer();
+  stream.listen(
+    sink.add,
+    onError: sink.addError,
+    onDone: () => completer.complete(),
+  );
+  return completer.future;
+}
+
 String _getSeparatorChar(ListFormat collectionFormat, bool isQuery) {
   switch (collectionFormat) {
     case ListFormat.csv:
@@ -125,11 +132,4 @@ String _getSeparatorChar(ListFormat collectionFormat, bool isQuery) {
   }
 }
 
-Map<String, V> caseInsensitiveKeyMap<V>([Map<String, V>? value]) {
-  final map = LinkedHashMap<String, V>(
-    equals: (key1, key2) => key1.toLowerCase() == key2.toLowerCase(),
-    hashCode: (key) => key.toLowerCase().hashCode,
-  );
-  if (value != null && value.isNotEmpty) map.addAll(value);
-  return map;
-}
+typedef DioEncodeHandler = String? Function(String key, Object? value);

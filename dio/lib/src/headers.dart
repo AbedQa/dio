@@ -22,32 +22,21 @@ class Headers {
 
   final Map<String, List<String>> _map;
 
-  Map<String, List<String>> get map => _map;
-
   Headers() : _map = caseInsensitiveKeyMap<List<String>>();
 
   Headers.fromMap(Map<String, List<String>> map)
       : _map = caseInsensitiveKeyMap<List<String>>(
-          map.map((k, v) => MapEntry(k.trim().toLowerCase(), v)),
+          map.map((k, v) => MapEntry(k.trim(), v)),
         );
+
+  bool get isEmpty => _map.isEmpty;
+
+  Map<String, List<String>> get map => _map;
 
   /// Returns the list of values for the header named [name]. If there
   /// is no header with the provided name, [:null:] will be returned.
   List<String>? operator [](String name) {
-    return _map[name.trim().toLowerCase()];
-  }
-
-  /// Convenience method for the value for a single valued header. If
-  /// there is no header with the provided name, [:null:] will be
-  /// returned. If the header has more than one value an exception is
-  /// thrown.
-  String? value(String name) {
-    final arr = this[name];
-    if (arr == null) return null;
-    if (arr.length == 1) return arr.first;
-    throw Exception(
-      '"$name" header has more than one value, please use Headers[name]',
-    );
+    return _map[name.trim()];
   }
 
   /// Adds a header value. The header named [name] will have the value
@@ -58,15 +47,16 @@ class Headers {
     arr.add(value);
   }
 
-  /// Sets a header. The header named [name] will have all its values
-  /// cleared before the value [value] is added as its value.
-  void set(String name, dynamic value) {
-    if (value == null) return;
-    name = name.trim().toLowerCase();
-    if (value is List) {
-      _map[name] = value.map<String>((e) => e.toString()).toList();
-    } else {
-      _map[name] = ['$value'.trim()];
+  void clear() {
+    _map.clear();
+  }
+
+  /// Enumerates the headers, applying the function [f] to each
+  /// header. The header name passed in [:name:] will be all lower
+  /// case.
+  void forEach(HeaderForEachCallback f) {
+    for (final key in _map.keys) {
+      f(key, this[key]!);
     }
   }
 
@@ -82,18 +72,15 @@ class Headers {
     _map.remove(name);
   }
 
-  void clear() {
-    _map.clear();
-  }
-
-  bool get isEmpty => _map.isEmpty;
-
-  /// Enumerates the headers, applying the function [f] to each
-  /// header. The header name passed in [:name:] will be all lower
-  /// case.
-  void forEach(HeaderForEachCallback f) {
-    for (final key in _map.keys) {
-      f(key, this[key]!);
+  /// Sets a header. The header named [name] will have all its values
+  /// cleared before the value [value] is added as its value.
+  void set(String name, dynamic value) {
+    if (value == null) return;
+    name = name.trim();
+    if (value is List) {
+      _map[name] = value.map<String>((e) => e.toString()).toList();
+    } else {
+      _map[name] = ['$value'.trim()];
     }
   }
 
@@ -106,5 +93,18 @@ class Headers {
       }
     });
     return stringBuffer.toString();
+  }
+
+  /// Convenience method for the value for a single valued header. If
+  /// there is no header with the provided name, [:null:] will be
+  /// returned. If the header has more than one value an exception is
+  /// thrown.
+  String? value(String name) {
+    final arr = this[name];
+    if (arr == null) return null;
+    if (arr.length == 1) return arr.first;
+    throw Exception(
+      '"$name" header has more than one value, please use Headers[name]',
+    );
   }
 }
